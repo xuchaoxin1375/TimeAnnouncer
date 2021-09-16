@@ -8,8 +8,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.Build
-import android.os.Bundle
+import android.os.*
 import android.os.SystemClock.sleep
 import android.view.View
 import android.widget.TextView
@@ -18,20 +17,22 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.ViewModelProvider
 import com.cxxu.timeannouncer.StringTool.showToast
 import java.util.*
+import kotlin.concurrent.thread
 
 private const val TAG = "MainActivity"
 
 class MainActivity : AppCompatActivity() {
     lateinit var timeChangeReceiver: TimeChangeReceiver
     lateinit var viewModel: MainViewModel
-    lateinit var timeText :TextView
+//    lateinit var timeText :TextView
+
     val calendar: Calendar = Calendar.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-//        var timeText = findViewById<TextView>(R.id.timeText)
+        var timeText = findViewById<TextView>(R.id.timeText)
         val intentFilter = IntentFilter()
         intentFilter.addAction("android.intent.action.TIME_TICK")
         timeChangeReceiver = TimeChangeReceiver()
@@ -46,8 +47,33 @@ class MainActivity : AppCompatActivity() {
 //            "while..".showToast()
 //            refreshCounter()
 //        }
-        Lg.d(TAG,"执行了refresher()")
+        Lg.d(TAG, "执行了refresher()")
         counterViewRefresher()
+/**/
+        val updateTextID = 1
+        /*base on the handler Asynchronous message processing mechanism ,it refer to :
+        Handler/handleMessage();Message  */
+
+        val handler = object : Handler(Looper.getMainLooper()) {
+            override fun handleMessage(msg: Message) {
+
+                // 在这里可以进行UI操作
+                when (msg.what) {
+//                    updateTextID -> timeText.text = "Nice to meet you"
+                    updateTextID -> timeText.text = getTime()
+                }
+            }
+        }
+        /*Child thread:*/
+        thread {
+            while (true) {
+                sleep(1000)
+                /*instantiate a Message (use Message.what property to keep data there)*/
+                val msg = Message()
+                msg.what = updateTextID //do assignment(dataID is encapsulated to the Message.what)
+                handler.sendMessage(msg) // 将Message对象发送出去(回到主线程(orginal thread) 中的handleMessage(),如此一来,就可以让主线程更新UI了)
+            }
+        }
     }
 
     /*testing...*/
@@ -62,24 +88,27 @@ class MainActivity : AppCompatActivity() {
         val sec = calendar.get(Calendar.SECOND)
         viewModel.counter = sec
         Lg.d(TAG, "test the while..")
-        timeText.text = viewModel.counter.toString()
+//        timeText.text = viewModel.counter.toString()
     }
 
     /*countAdd refresh*/
     private fun counterViewRefresher() {
-        var timeText = findViewById<TextView>(R.id.timeText)
+        var timeText = findViewById<TextView>(R.id.counter)
         timeText.text = viewModel.counter.toString()
     }
 
-    fun countAddBtn(view:View){
+    /*使用onClick 注册一定程度上可以减少findViewById的书写:以下Btn函数在布局编辑器中绑定好了*/
+    fun countAddBtn(view: View) {
         viewModel.counter++
         counterViewRefresher()
 
     }
-    fun countSubBtn(view: View){
+
+    fun countSubBtn(view: View) {
         viewModel.counter--
         counterViewRefresher()
     }
+
     lateinit var manager: NotificationManager
 
     private fun createNotificationChannel() {
@@ -143,13 +172,21 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    /*监听按钮方法(注意参数,注意,采用这种方式注册点击事件,您的函数不可以使用private,同时参数为view:View 方可被布局编辑器识别到*/
-    fun showTime(view: View) {
+
+    fun getTime(): String {
         val calendar = Calendar.getInstance()
         val h = calendar.get(Calendar.HOUR)
         val min = calendar.get(Calendar.MINUTE)
         val sec = calendar.get(Calendar.SECOND)
-        "现在时刻:$h:$min:$sec".showToast()
+        val time = "现在时刻:$h:$min:$sec"
+        return time
+    }
+
+    /*监听按钮方法(注意参数,注意,采用这种方式注册点击事件,您的函数不可以使用private,
+    同时参数为view:View 方可被布局编辑器识别到
+    此外借助单独编写的getTime()来解耦,返回时间字符串*/
+    fun showTime(view: View) {
+        getTime().showToast()
     }
 
 }
